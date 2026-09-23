@@ -46,23 +46,36 @@ export const flattenUploadedFiles = (files = {}) =>
 
 export const validateUploadedFileSignatures = async (files) => {
   for (const file of files) {
-    const handle = await fs.open(file.path, "r");
-    const header = Buffer.alloc(2048);
+    let header;
 
-    try {
-      const { bytesRead } = await handle.read(header, 0, header.length, 0);
-      const detectedMime = detectMimeFromHeader(header.subarray(0, bytesRead));
-      const reportedMime = normalizeMime(file.mimetype);
+    if (Buffer.isBuffer(file.buffer)) {
+      header = file.buffer.subarray(0, 2048);
+    } else {
+      const handle = await fs.open(file.path, "r");
+      const diskHeader = Buffer.alloc(2048);
 
-      if (!detectedMime || detectedMime !== reportedMime) {
-        throw new HttpError(
-          415,
-          "FILE_SIGNATURE_MISMATCH",
-          `Isi file ${file.originalname} tidak sesuai dengan format yang dilaporkan.`
+      try {
+        const { bytesRead } = await handle.read(
+          diskHeader,
+          0,
+          diskHeader.length,
+          0
         );
+        header = diskHeader.subarray(0, bytesRead);
+      } finally {
+        await handle.close();
       }
-    } finally {
-      await handle.close();
+    }
+
+    const detectedMime = detectMimeFromHeader(header);
+    const reportedMime = normalizeMime(file.mimetype);
+
+    if (!detectedMime || detectedMime !== reportedMime) {
+      throw new HttpError(
+        415,
+        "FILE_SIGNATURE_MISMATCH",
+        `Isi file ${file.originalname} tidak sesuai dengan format yang dilaporkan.`
+      );
     }
   }
 };

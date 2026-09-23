@@ -22,9 +22,13 @@ const getTransporter = () => {
       user: env.smtpUser,
       pass: env.smtpPass,
     },
-    pool: true,
-    maxConnections: 3,
-    maxMessages: 100,
+    ...(env.isVercel
+      ? {}
+      : {
+          pool: true,
+          maxConnections: 3,
+          maxMessages: 100,
+        }),
   });
 
   return transporter;
@@ -57,6 +61,11 @@ export const sendSubmissionEmail = async ({
   acceptedAt,
   applicantEmail,
 }) => {
+  const attachmentContent = (file) =>
+    Buffer.isBuffer(file.buffer)
+      ? { content: file.buffer }
+      : { path: file.path };
+
   const visibleAttachments = [
     {
       label: "Bukti Transfer",
@@ -82,14 +91,14 @@ export const sendSubmissionEmail = async ({
   const attachments = [
     {
       filename: `00-bukti-transfer-${safeAttachmentName(paymentProof.originalname)}`,
-      path: paymentProof.path,
+      ...attachmentContent(paymentProof),
       contentType: paymentProof.mimetype,
     },
     ...documentFiles.map((file, index) => ({
       filename: `${String(index + 1).padStart(2, "0")}-${safeAttachmentName(
         fileManifest[index]?.label || `dokumen-${index + 1}`
       )}-${safeAttachmentName(file.originalname)}`,
-      path: file.path,
+      ...attachmentContent(file),
       contentType: file.mimetype,
     })),
     {

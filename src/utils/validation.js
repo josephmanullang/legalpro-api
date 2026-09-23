@@ -1,5 +1,6 @@
 import { COMPANY_TYPES, calculateSubmissionPrice } from "./pricing.js";
 import { HttpError } from "./http-error.js";
+import { env } from "../config/env.js";
 
 const isPlainObject = (value) =>
   value !== null &&
@@ -11,6 +12,9 @@ const isNonEmptyString = (value, maxLength = 500) =>
   typeof value === "string" &&
   value.trim().length > 0 &&
   value.trim().length <= maxLength;
+
+export const isValidRequestId = (value) =>
+  isNonEmptyString(value, 100) && /^[a-zA-Z0-9_-]{8,100}$/.test(value);
 
 export const parseJsonField = (value, fieldName) => {
   if (!isNonEmptyString(value, 1_500_000)) {
@@ -41,7 +45,7 @@ export const validateSubmissionPayload = (payload) => {
     throw new HttpError(400, "INVALID_REQUEST_ID", "requestId wajib diisi.");
   }
 
-  if (!/^[a-zA-Z0-9_-]{8,100}$/.test(payload.requestId)) {
+  if (!isValidRequestId(payload.requestId)) {
     throw new HttpError(
       400,
       "INVALID_REQUEST_ID",
@@ -119,7 +123,7 @@ export const validateSubmissionPayload = (payload) => {
   };
 };
 
-export const validateFileManifest = (manifest, documentFiles) => {
+export const validateFileManifestShape = (manifest) => {
   if (!Array.isArray(manifest)) {
     throw new HttpError(
       400,
@@ -128,11 +132,19 @@ export const validateFileManifest = (manifest, documentFiles) => {
     );
   }
 
-  if (manifest.length !== documentFiles.length) {
+  if (manifest.length === 0) {
     throw new HttpError(
       400,
-      "FILE_MANIFEST_MISMATCH",
-      "Jumlah data pada fileManifest tidak sama dengan jumlah dokumen."
+      "DOCUMENTS_REQUIRED",
+      "Minimal satu dokumen KTP wajib dikirim."
+    );
+  }
+
+  if (manifest.length > env.maxDocumentFiles) {
+    throw new HttpError(
+      400,
+      "TOO_MANY_DOCUMENTS",
+      `Maksimal ${env.maxDocumentFiles} dokumen dapat dikirim.`
     );
   }
 
@@ -153,4 +165,29 @@ export const validateFileManifest = (manifest, documentFiles) => {
       );
     }
   });
+
+  const uniquePaths = new Set(manifest.map((item) => item.path));
+  if (uniquePaths.size !== manifest.length) {
+    throw new HttpError(
+      400,
+      "DUPLICATE_FILE_MANIFEST_PATH",
+      "Setiap dokumen pada fileManifest harus memiliki path yang berbeda."
+    );
+  }
+
+  return manifest;
+};
+
+export const validateFileManifest = (manifest, documentFiles) => {
+  validateFileManifestShape(manifest);
+
+  if (manifest.length !== documentFiles.length) {
+    throw new HttpError(
+      400,
+      "FILE_MANIFEST_MISMATCH",
+      "Jumlah data pada fileManifest tidak sama dengan jumlah dokumen."
+    );
+  }
+
+  return manifest;
 };

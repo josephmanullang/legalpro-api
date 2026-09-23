@@ -6,8 +6,30 @@ import {
   verifyMailTransport,
 } from "./services/mail.service.js";
 
-const start = async () => {
-  assertRuntimeEnv();
+assertRuntimeEnv();
+
+const app = createApp();
+
+const listen = () =>
+  app.listen(env.port, () => {
+    console.log(
+      JSON.stringify({
+        level: "info",
+        event: "server_started",
+        port: env.port,
+        environment: env.nodeEnv,
+        platform: env.isVercel ? "vercel" : "node",
+        mailTransport: env.mailTransport,
+      })
+    );
+  });
+
+let server;
+
+if (env.isVercel) {
+  // Vercel menangkap server Express dari listen() saat module dimuat.
+  server = listen();
+} else {
   await ensureUploadDirectory();
   await cleanupStaleUploads();
 
@@ -15,19 +37,10 @@ const start = async () => {
     await verifyMailTransport();
   }
 
-  const app = createApp();
-  const server = app.listen(env.port, () => {
-    console.log(
-      JSON.stringify({
-        level: "info",
-        event: "server_started",
-        port: env.port,
-        environment: env.nodeEnv,
-        mailTransport: env.mailTransport,
-      })
-    );
-  });
+  server = listen();
+}
 
+if (!env.isVercel) {
   const shutdown = (signal) => {
     console.log(
       JSON.stringify({ level: "info", event: "server_stopping", signal })
@@ -43,16 +56,4 @@ const start = async () => {
 
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   process.on("SIGINT", () => shutdown("SIGINT"));
-};
-
-start().catch((error) => {
-  console.error(
-    JSON.stringify({
-      level: "fatal",
-      event: "server_start_failed",
-      error: error.message,
-    })
-  );
-  closeMailTransport();
-  process.exit(1);
-});
+}

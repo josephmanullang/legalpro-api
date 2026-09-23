@@ -5,6 +5,7 @@ import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
 import { env } from "./config/env.js";
 import submissionRoutes from "./routes/submission.routes.js";
+import uploadRoutes from "./routes/upload.routes.js";
 import { errorHandler, notFoundHandler } from "./middleware/error-handler.js";
 import { HttpError } from "./utils/http-error.js";
 
@@ -43,7 +44,7 @@ export const createApp = () => {
 
   app.use(helmet());
   app.use(cors(corsOptions));
-  app.use(express.json({ limit: "100kb" }));
+  app.use(express.json({ limit: "1mb" }));
 
   app.get("/health", (_req, res) => {
     res.json({
@@ -67,6 +68,21 @@ export const createApp = () => {
     },
   });
 
+  const uploadLimiter = rateLimit({
+    windowMs: env.rateLimitWindowMinutes * 60 * 1000,
+    limit: Math.max(env.rateLimitMaxRequests * 10, 100),
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+    message: {
+      success: false,
+      error: {
+        code: "TOO_MANY_UPLOAD_REQUESTS",
+        message: "Terlalu banyak permintaan upload. Silakan tunggu beberapa saat.",
+      },
+    },
+  });
+
+  app.use("/api/v1/uploads", uploadLimiter, uploadRoutes);
   app.use("/api/v1/submissions", submissionLimiter, submissionRoutes);
   app.use(notFoundHandler);
   app.use(errorHandler);
