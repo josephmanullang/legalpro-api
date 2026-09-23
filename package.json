@@ -1,0 +1,25 @@
+{
+  "name": "notaris-email-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Backend Express tanpa database untuk menerima pengajuan legalitas dan mengirimkannya melalui email.",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "test": "node --test --test-concurrency=1",
+    "check": "node --check src/server.js && node --check src/app.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^5.1.0",
+    "express-rate-limit": "^7.5.1",
+    "helmet": "^8.1.0",
+    "multer": "^2.0.2",
+    "nodemailer": "^10.0.10"
+  }
+}
