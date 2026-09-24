@@ -6,45 +6,56 @@ import {
   verifyMailTransport,
 } from "./services/mail.service.js";
 
-assertRuntimeEnv();
+try {
+  assertRuntimeEnv();
+} catch (error) {
+  console.error(
+    JSON.stringify({
+      level: "fatal",
+      event: "runtime_environment_invalid",
+      error: error.message,
+    })
+  );
+  throw error;
+}
 
 const app = createApp();
 
-const listen = () =>
-  app.listen(env.port, () => {
-    console.log(
-      JSON.stringify({
-        level: "info",
-        event: "server_started",
-        port: env.port,
-        environment: env.nodeEnv,
-        platform: env.isVercel ? "vercel" : "node",
-        mailTransport: env.mailTransport,
-      })
-    );
-  });
-
-let server;
-
-if (env.isVercel) {
-  // Vercel menangkap server Express dari listen() saat module dimuat.
-  server = listen();
-} else {
-  await ensureUploadDirectory();
-  await cleanupStaleUploads();
-
-  if (env.verifySmtpOnStartup) {
-    await verifyMailTransport();
-  }
-
-  server = listen();
-}
-
 if (!env.isVercel) {
+  let server;
+
+  const startServer = async () => {
+    await ensureUploadDirectory();
+    await cleanupStaleUploads();
+
+    if (env.verifySmtpOnStartup) {
+      await verifyMailTransport();
+    }
+
+    server = app.listen(env.port, () => {
+      console.log(
+        JSON.stringify({
+          level: "info",
+          event: "server_started",
+          port: env.port,
+          environment: env.nodeEnv,
+          platform: "node",
+          mailTransport: env.mailTransport,
+        })
+      );
+    });
+  };
+
   const shutdown = (signal) => {
     console.log(
       JSON.stringify({ level: "info", event: "server_stopping", signal })
     );
+
+    if (!server) {
+      closeMailTransport();
+      process.exit(0);
+      return;
+    }
 
     server.close(() => {
       closeMailTransport();
@@ -56,4 +67,17 @@ if (!env.isVercel) {
 
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   process.on("SIGINT", () => shutdown("SIGINT"));
+
+  startServer().catch((error) => {
+    console.error(
+      JSON.stringify({
+        level: "fatal",
+        event: "server_start_failed",
+        error: error.message,
+      })
+    );
+    process.exit(1);
+  });
 }
+
+export default app;
