@@ -1,25 +1,10 @@
-import { createApp } from "./app.js";
-import { assertRuntimeEnv, env } from "./config/env.js";
+import app from "./app.js";
+import { env } from "./config/env.js";
 import { cleanupStaleUploads, ensureUploadDirectory } from "./utils/files.js";
 import {
   closeMailTransport,
   verifyMailTransport,
 } from "./services/mail.service.js";
-
-try {
-  assertRuntimeEnv();
-} catch (error) {
-  console.error(
-    JSON.stringify({
-      level: "fatal",
-      event: "runtime_environment_invalid",
-      error: error.message,
-    })
-  );
-  throw error;
-}
-
-const app = createApp();
 
 if (!env.isVercel) {
   let server;

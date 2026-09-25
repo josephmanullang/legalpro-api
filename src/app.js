@@ -3,7 +3,7 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
-import { env } from "./config/env.js";
+import { assertRuntimeEnv, env } from "./config/env.js";
 import submissionRoutes from "./routes/submission.routes.js";
 import uploadRoutes from "./routes/upload.routes.js";
 import { errorHandler, notFoundHandler } from "./middleware/error-handler.js";
@@ -30,7 +30,9 @@ const corsOptions = {
   maxAge: 86400,
 };
 
-export const createApp = () => {
+assertRuntimeEnv();
+
+const createApp = () => {
   const app = express();
 
   app.disable("x-powered-by");
@@ -89,3 +91,7 @@ export const createApp = () => {
 
   return app;
 };
+
+const app = createApp();
+
+export default app;
