@@ -3,6 +3,7 @@ import { env } from "../config/env.js";
 import { buildSubmissionEmail } from "../templates/submission-email.js";
 import { safeAttachmentName } from "../utils/files.js";
 import { HttpError } from "../utils/http-error.js";
+import { prepareSubmissionEmailData } from "../utils/submission-email-data.js";
 
 let transporter;
 
@@ -61,6 +62,15 @@ export const sendSubmissionEmail = async ({
   acceptedAt,
   applicantEmail,
 }) => {
+  const emailData = prepareSubmissionEmailData({
+    payload,
+    fileManifest,
+    documentFiles,
+  });
+  const emailPayload = emailData.payload;
+  const emailFileManifest = emailData.fileManifest;
+  const emailDocumentFiles = emailData.documentFiles;
+
   const attachmentContent = (file) =>
     Buffer.isBuffer(file.buffer)
       ? { content: file.buffer }
@@ -71,8 +81,11 @@ export const sendSubmissionEmail = async ({
       label: "Bukti Transfer",
       fileName: paymentProof.originalname,
     },
-    ...documentFiles.map((file, index) => ({
-      label: fileManifest[index]?.label || fileManifest[index]?.path || `Dokumen ${index + 1}`,
+    ...emailDocumentFiles.map((file, index) => ({
+      label:
+        emailFileManifest[index]?.label ||
+        emailFileManifest[index]?.path ||
+        `Dokumen ${index + 1}`,
       fileName: file.originalname,
     })),
     {
@@ -82,7 +95,7 @@ export const sendSubmissionEmail = async ({
   ];
 
   const email = buildSubmissionEmail({
-    payload,
+    payload: emailPayload,
     serverReference,
     acceptedAt,
     attachments: visibleAttachments,
@@ -94,9 +107,9 @@ export const sendSubmissionEmail = async ({
       ...attachmentContent(paymentProof),
       contentType: paymentProof.mimetype,
     },
-    ...documentFiles.map((file, index) => ({
+    ...emailDocumentFiles.map((file, index) => ({
       filename: `${String(index + 1).padStart(2, "0")}-${safeAttachmentName(
-        fileManifest[index]?.label || `dokumen-${index + 1}`
+        emailFileManifest[index]?.label || `dokumen-${index + 1}`
       )}-${safeAttachmentName(file.originalname)}`,
       ...attachmentContent(file),
       contentType: file.mimetype,
@@ -108,8 +121,8 @@ export const sendSubmissionEmail = async ({
           {
             serverReference,
             acceptedAt: acceptedAt.toISOString(),
-            ...payload,
-            fileManifest,
+            ...emailPayload,
+            fileManifest: emailFileManifest,
           },
           null,
           2
